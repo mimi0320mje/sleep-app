@@ -33,11 +33,17 @@ A calming, mobile-friendly web app for ambient sounds, meditation music, and sle
 ## Audio Credits
 
 Ambient sounds are from the [Google Sound Library](https://developers.google.com/assistant/tools/sound-library),
-licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Each scene layers two
+recordings of different lengths so the loop doesn't obviously repeat:
 
-- `audio/ocean.ogg` — "Waves Crashing On Rock Beach"
-- `audio/forest.ogg` — "Summer Forest"
-- `audio/snow.ogg` — "Strong Wind"
+- Ocean — "Waves Crashing On Rock Beach" + "Light Breeze"
+- Forest — "Summer Forest" + "Wind In Leaves On Porch"
+- Snow — "Room Tone Wind Blowing (Long)" + "Rumbling Wind"
+
+## Location readout
+
+The location line is themed to each scene's real-world place (Maldives for ocean, Black Forest
+for forest, Lapland for snow) and shows that location's **live local time**, ticking every second.
 
 ## Architecture
 

@@ -1,14 +1,32 @@
 // Sleep App - Main Application Logic
 
 // Sound metadata — real CC-BY nature recordings hosted locally (audio/ folder)
+// Each scene layers a PRIMARY loop + a SECONDARY texture of a different length.
+// Different loop lengths decorrelate, so the combined sound rarely repeats.
+// `place` ties the location readout to a real-world ocean/forest/snow spot,
+// with an IANA timezone so we can show its live local time.
 const SOUND_INFO = {
-    ocean: { name: 'Ocean Waves', theme: 'ocean-theme', icon: '🌊', file: 'audio/ocean.ogg' },
-    forest: { name: 'Forest Ambience', theme: 'forest-theme', icon: '🌲', file: 'audio/forest.ogg' },
-    snow: { name: 'Snow Silence', theme: 'snow-theme', icon: '❄️', file: 'audio/snow.ogg' }
+    ocean: {
+        name: 'Ocean Waves', theme: 'ocean-theme', icon: '🌊',
+        file: 'audio/ocean.ogg', file2: 'audio/ocean2.ogg', vol2: 0.35,
+        place: { name: 'Maldives', lat: 3.2028, lon: 73.2207, tz: 'Indian/Maldives' }
+    },
+    forest: {
+        name: 'Forest Ambience', theme: 'forest-theme', icon: '🌲',
+        file: 'audio/forest.ogg', file2: 'audio/forest2.ogg', vol2: 0.45,
+        place: { name: 'Black Forest, Germany', lat: 48.2700, lon: 8.2000, tz: 'Europe/Berlin' }
+    },
+    snow: {
+        name: 'Snow Silence', theme: 'snow-theme', icon: '❄️',
+        file: 'audio/snow.ogg', file2: 'audio/snow2.ogg', vol2: 0.30,
+        place: { name: 'Lapland, Finland', lat: 67.8200, lon: 24.8100, tz: 'Europe/Helsinki' }
+    }
 };
 
 // DOM Elements
-const audioPlayer = document.getElementById('audioPlayer');
+const audioPlayer = document.getElementById('audioPlayer');   // primary layer
+const audioLayer2 = new Audio();                              // secondary texture layer
+audioLayer2.loop = true;
 const playBtn = document.getElementById('playBtn');
 const volumeSlider = document.getElementById('volumeSlider');
 const currentSoundDisplay = document.getElementById('currentSound');
@@ -27,15 +45,23 @@ let isDarkMode = false;
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
-    loadLocation();
     loadQuote();
     setupEventListeners();
-    // Set up the default sound (theme, label, and audio source)
+    // Set up the default sound (theme, label, audio sources, location)
     body.classList.add(SOUND_INFO[currentSound].theme);
     currentSoundDisplay.textContent = SOUND_INFO[currentSound].name;
-    audioPlayer.src = SOUND_INFO[currentSound].file;
-    audioPlayer.loop = true;
+    applySources(currentSound);
+    startLocationClock();
 });
+
+// Point both audio layers at the files for the given scene
+function applySources(sound) {
+    const info = SOUND_INFO[sound];
+    audioPlayer.src = info.file;
+    audioPlayer.loop = true;
+    audioLayer2.src = info.file2;
+    audioLayer2.loop = true;
+}
 
 // Theme Management
 function initTheme() {
@@ -86,28 +112,33 @@ function selectSound(sound) {
     // Update display
     currentSoundDisplay.textContent = SOUND_INFO[sound].name;
 
-    // Switch the audio source to the new sound, keeping playback state
-    audioPlayer.src = SOUND_INFO[sound].file;
-    audioPlayer.loop = true;
+    // Switch both audio layers to the new scene, keeping playback state
+    applySources(sound);
+    applyVolume();
     if (isPlaying) {
         audioPlayer.play().catch(err => console.error('Play failed:', err));
+        audioLayer2.play().catch(err => console.error('Layer2 play failed:', err));
     }
+
+    // Refresh the location readout to this scene's place immediately
+    renderLocation();
 }
 
-// Audio playback — simple, reliable HTML5 <audio> with local files
+// Audio playback — two layered HTML5 <audio> loops per scene
 function togglePlayPause() {
     if (isPlaying) {
         audioPlayer.pause();
+        audioLayer2.pause();
         isPlaying = false;
         playBtn.classList.remove('playing');
         playBtn.textContent = '▶';
     } else {
-        // Make sure a source is set (defaults to current sound)
-        if (!audioPlayer.src) {
-            audioPlayer.src = SOUND_INFO[currentSound].file;
-            audioPlayer.loop = true;
-        }
-        audioPlayer.play().then(() => {
+        if (!audioPlayer.src) applySources(currentSound);
+        applyVolume();
+        Promise.all([
+            audioPlayer.play(),
+            audioLayer2.play()
+        ]).then(() => {
             isPlaying = true;
             playBtn.classList.add('playing');
             playBtn.textContent = '⏸';
@@ -118,51 +149,42 @@ function togglePlayPause() {
     }
 }
 
-// Volume Control
+// Volume Control — master slider scales both layers (secondary is mixed lower)
 function setVolume(value) {
-    audioPlayer.volume = value / 100;
     localStorage.setItem('sleepAppVolume', value);
+    applyVolume();
 }
 
-// Geolocation & IP Display
-async function loadLocation() {
+function applyVolume() {
+    const master = (localStorage.getItem('sleepAppVolume') ?? volumeSlider.value) / 100;
+    audioPlayer.volume = master;
+    audioLayer2.volume = master * (SOUND_INFO[currentSound].vol2 ?? 0.4);
+}
+
+// Location readout — themed to the current scene's real-world place,
+// with a LIVE local clock that ticks every second (the "real-time" part).
+function renderLocation() {
+    const place = SOUND_INFO[currentSound].place;
+
+    // Live local time at that place (uses the IANA timezone)
+    let clock = '--:--:--';
     try {
-        // Using ipwho.is - CORS-friendly API
-        const response = await fetch('https://ipwho.is/');
-        if (!response.ok) throw new Error('Network response was not ok');
+        clock = new Intl.DateTimeFormat('en-GB', {
+            timeZone: place.tz, hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }).format(new Date());
+    } catch (e) { /* timezone unsupported — leave placeholder */ }
 
-        const data = await response.json();
-        const ip = data.ip || '[unknown]';
-        const city = data.city || 'Unknown';
-        const country = data.country || 'Unknown';
-        const timezone = data.timezone || '';
+    // Format coordinates like a clean location readout
+    const lat = `${Math.abs(place.lat).toFixed(2)}°${place.lat >= 0 ? 'N' : 'S'}`;
+    const lon = `${Math.abs(place.lon).toFixed(2)}°${place.lon >= 0 ? 'E' : 'W'}`;
 
-        locationInfo.textContent = `IP: ${ip} | ${city}, ${country}`;
+    locationInfo.textContent = `📍 ${place.name} · ${lat} ${lon} · ${clock}`;
+}
 
-        // Set dark mode based on time of day
-        if (timezone && !localStorage.getItem('sleepAppTheme')) {
-            const now = new Date();
-            const hour = now.getHours();
-            if (hour >= 20 || hour < 6) {
-                isDarkMode = true;
-                updateTheme();
-            }
-        }
-    } catch (error) {
-        console.error('Error fetching location:', error);
-        locationInfo.textContent = 'IP: [loading...]';
-
-        // Try fallback API
-        try {
-            const fallback = await fetch('https://api.ipify.org?format=json');
-            if (fallback.ok) {
-                const data = await fallback.json();
-                locationInfo.textContent = `IP: ${data.ip}`;
-            }
-        } catch (e) {
-            locationInfo.textContent = 'IP: [checking...]';
-        }
-    }
+// Tick the clock once a second so the local time stays live
+function startLocationClock() {
+    renderLocation();
+    setInterval(renderLocation, 1000);
 }
 
 // Curated calming quotes — reliable, works offline, free forever
