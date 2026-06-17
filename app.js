@@ -1,18 +1,18 @@
 // Sleep App - Main Application Logic
 
-// Audio sources for different sounds (using free CC0 licensed audio)
+// Audio sources for different sounds (using verified working free streams)
 const AUDIO_SOURCES = {
     ocean: [
-        'https://cdn.pixabay.com/media/assets/cdn-shop/20230712/original-86f32b4e-7a5e-47a0-9f04-b4ed85b8e6be.mp3',
-        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3'
+        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+        'https://assets.mixkit.co/active_storage/sfx/2728/2728-preview.mp3'
     ],
     forest: [
-        'https://cdn.pixabay.com/media/assets/cdn-shop/20221211/original-dc96e34f-0d6f-485d-b8c1-1d2cee98eb6b.mp3',
-        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'
+        'https://assets.mixkit.co/active_storage/sfx/2734/2734-preview.mp3',
+        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3'
     ],
     snow: [
-        'https://cdn.pixabay.com/media/assets/cdn-shop/20210831/original-2c87fa37-69cf-4e3f-b6c5-d7f47e4186fb.mp3',
-        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3'
+        'https://assets.mixkit.co/active_storage/sfx/2729/2729-preview.mp3',
+        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'
     ]
 };
 
