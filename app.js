@@ -31,12 +31,14 @@ let isDarkMode = false;
 let masterGain = null;
 
 // Initialize app
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     loadLocation();
     loadQuote();
     setupEventListeners();
-    loadAudio('ocean');
+    // Set initial theme/display for the default sound
+    body.classList.add(SOUND_INFO[currentSound].theme);
+    currentSoundDisplay.textContent = SOUND_INFO[currentSound].name;
 });
 
 // Theme Management
@@ -248,20 +250,34 @@ async function loadLocation() {
     }
 }
 
-// Daily Quote
-async function loadQuote() {
-    try {
-        const response = await fetch('https://api.quotable.io/random');
-        if (!response.ok) throw new Error('Network response was not ok');
+// Curated calming quotes — reliable, works offline, free forever
+const QUOTES = [
+    { text: 'Sleep is the best meditation.', author: 'Dalai Lama' },
+    { text: 'Rest when you are weary. Refresh and renew yourself, your body, your mind, your spirit.', author: 'Ralph Marston' },
+    { text: 'A good laugh and a long sleep are the two best cures for anything.', author: 'Irish Proverb' },
+    { text: 'The night is the hardest time to be alive, but the dawn always comes.', author: 'Unknown' },
+    { text: 'Let go of the day. Tomorrow is a fresh start.', author: 'Unknown' },
+    { text: 'Quiet the mind, and the soul will speak.', author: 'Ma Jaya Sati Bhagavati' },
+    { text: 'Almost everything will work again if you unplug it for a few minutes, including you.', author: 'Anne Lamott' },
+    { text: 'Within you there is a stillness and a sanctuary to which you can retreat at any time.', author: 'Hermann Hesse' },
+    { text: 'Each night, when I go to sleep, I die. And the next morning, when I wake up, I am reborn.', author: 'Mahatma Gandhi' },
+    { text: 'Peace begins with a single breath.', author: 'Unknown' },
+    { text: 'There is a time for many words, and there is also a time for sleep.', author: 'Homer' },
+    { text: 'Take rest; a field that has rested gives a bountiful crop.', author: 'Ovid' },
+    { text: 'Calmness is the cradle of power.', author: 'Josiah Gilbert Holland' },
+    { text: 'Tension is who you think you should be. Relaxation is who you are.', author: 'Chinese Proverb' },
+    { text: 'The day is over. You did enough. Rest now.', author: 'Unknown' }
+];
 
-        const data = await response.json();
-        quoteText.textContent = `"${data.content}"`;
-        quoteAuthor.textContent = `— ${data.author.split(',')[0]}`;
-    } catch (error) {
-        console.error('Error fetching quote:', error);
-        quoteText.textContent = '"The only real failure is not taking care of yourself."';
-        quoteAuthor.textContent = '— Unknown';
-    }
+// Daily Quote — same quote all day, rotates each calendar day
+function loadQuote() {
+    // Pick a quote based on the day of the year (stable for the whole day)
+    const now = new Date();
+    const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+    const quote = QUOTES[dayOfYear % QUOTES.length];
+
+    quoteText.textContent = `"${quote.text}"`;
+    quoteAuthor.textContent = `— ${quote.author}`;
 }
 
 // Event Listeners
