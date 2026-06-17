@@ -25,10 +25,19 @@ A calming, mobile-friendly web app for ambient sounds, meditation music, and sle
 
 - **Frontend**: HTML5, CSS3, Vanilla JavaScript (no build system required)
 - **APIs Used** (all free tier):
-  - [ip-api.com](https://ip-api.com) - Geolocation
-  - [Quotable.io](https://quotable.io) - Daily quotes
-  - [Pixabay Audio](https://pixabay.com/music/) - Ambient sounds
+  - [ipwho.is](https://ipwho.is) - Geolocation (CORS-friendly)
   - YouTube & Spotify - Meditation music links
+- **Ambient audio**: real nature recordings hosted locally in `audio/` (no external dependency, works offline)
+- **Quotes**: curated local set that rotates daily (no API, always available)
+
+## Audio Credits
+
+Ambient sounds are from the [Google Sound Library](https://developers.google.com/assistant/tools/sound-library),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
+
+- `audio/ocean.ogg` — "Waves Crashing On Rock Beach"
+- `audio/forest.ogg` — "Summer Forest"
+- `audio/snow.ogg` — "Strong Wind"
 
 ## Architecture
 

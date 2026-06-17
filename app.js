@@ -1,19 +1,14 @@
 // Sleep App - Main Application Logic
 
-// Web Audio API for generating ambient sounds
-let audioContext = null;
-let oscillators = [];
-let gainNodes = [];
-let noiseBuffer = null;
-
-// Sound metadata
+// Sound metadata — real CC-BY nature recordings hosted locally (audio/ folder)
 const SOUND_INFO = {
-    ocean: { name: 'Ocean Waves', theme: 'ocean-theme', icon: '🌊', freq: [80, 120, 100] },
-    forest: { name: 'Forest Ambience', theme: 'forest-theme', icon: '🌲', freq: [150, 200, 180] },
-    snow: { name: 'Snow Silence', theme: 'snow-theme', icon: '❄️', freq: [200, 250, 220] }
+    ocean: { name: 'Ocean Waves', theme: 'ocean-theme', icon: '🌊', file: 'audio/ocean.ogg' },
+    forest: { name: 'Forest Ambience', theme: 'forest-theme', icon: '🌲', file: 'audio/forest.ogg' },
+    snow: { name: 'Snow Silence', theme: 'snow-theme', icon: '❄️', file: 'audio/snow.ogg' }
 };
 
 // DOM Elements
+const audioPlayer = document.getElementById('audioPlayer');
 const playBtn = document.getElementById('playBtn');
 const volumeSlider = document.getElementById('volumeSlider');
 const currentSoundDisplay = document.getElementById('currentSound');
@@ -28,7 +23,6 @@ const body = document.body;
 let currentSound = 'ocean';
 let isPlaying = false;
 let isDarkMode = false;
-let masterGain = null;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -36,9 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
     loadLocation();
     loadQuote();
     setupEventListeners();
-    // Set initial theme/display for the default sound
+    // Set up the default sound (theme, label, and audio source)
     body.classList.add(SOUND_INFO[currentSound].theme);
     currentSoundDisplay.textContent = SOUND_INFO[currentSound].name;
+    audioPlayer.src = SOUND_INFO[currentSound].file;
+    audioPlayer.loop = true;
 });
 
 // Theme Management
@@ -90,122 +86,41 @@ function selectSound(sound) {
     // Update display
     currentSoundDisplay.textContent = SOUND_INFO[sound].name;
 
-    // If playing, switch to new sound
+    // Switch the audio source to the new sound, keeping playback state
+    audioPlayer.src = SOUND_INFO[sound].file;
+    audioPlayer.loop = true;
     if (isPlaying) {
-        playAmbientSound(sound);
+        audioPlayer.play().catch(err => console.error('Play failed:', err));
     }
 }
 
-// Initialize Web Audio API
-function initAudio() {
-    if (audioContext) return;
-
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    masterGain = audioContext.createGain();
-    masterGain.connect(audioContext.destination);
-
-    // Create white noise buffer for ambient sounds
-    createNoiseBuffer();
-}
-
-// Create white noise for realistic ambient sounds
-function createNoiseBuffer() {
-    const bufferSize = audioContext.sampleRate * 2;
-    const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-
-    for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1;
-    }
-
-    window.noiseBuffer = noiseBuffer;
-}
-
-// Play ambient sound using Web Audio API
-function playAmbientSound(soundType) {
-    if (!audioContext) initAudio();
-
-    // Stop any existing sounds
-    stopSound();
-
-    const frequencies = SOUND_INFO[soundType].freq;
-
-    // Create noise source
-    const noiseSource = audioContext.createBufferSource();
-    noiseSource.buffer = window.noiseBuffer;
-    noiseSource.loop = true;
-
-    // Create filter for different characteristics
-    const filter = audioContext.createBiquadFilter();
-    filter.type = 'lowpass';
-
-    if (soundType === 'ocean') {
-        filter.frequency.value = 800;
-        filter.Q.value = 1;
-    } else if (soundType === 'forest') {
-        filter.frequency.value = 1200;
-        filter.Q.value = 0.5;
-    } else if (soundType === 'snow') {
-        filter.frequency.value = 6000;
-        filter.Q.value = 0.3;
-    }
-
-    // Connect nodes
-    noiseSource.connect(filter);
-    filter.connect(masterGain);
-
-    // Add subtle low frequency oscillators for ambient feel
-    const osc = audioContext.createOscillator();
-    osc.frequency.value = frequencies[0];
-    osc.type = 'sine';
-
-    const oscGain = audioContext.createGain();
-    oscGain.gain.value = 0.02;
-
-    osc.connect(oscGain);
-    oscGain.connect(masterGain);
-
-    noiseSource.start(0);
-    osc.start(0);
-
-    oscillators.push(osc);
-    gainNodes.push(oscGain);
-    oscillators.push(noiseSource);
-}
-
-function stopSound() {
-    oscillators.forEach(osc => {
-        try { osc.stop(); } catch(e) {}
-    });
-    oscillators = [];
-    gainNodes = [];
-}
-
+// Audio playback — simple, reliable HTML5 <audio> with local files
 function togglePlayPause() {
     if (isPlaying) {
-        stopSound();
+        audioPlayer.pause();
         isPlaying = false;
         playBtn.classList.remove('playing');
         playBtn.textContent = '▶';
     } else {
-        try {
-            initAudio();
-            playAmbientSound(currentSound);
+        // Make sure a source is set (defaults to current sound)
+        if (!audioPlayer.src) {
+            audioPlayer.src = SOUND_INFO[currentSound].file;
+            audioPlayer.loop = true;
+        }
+        audioPlayer.play().then(() => {
             isPlaying = true;
             playBtn.classList.add('playing');
             playBtn.textContent = '⏸';
-        } catch (err) {
+        }).catch(err => {
             console.error('Play failed:', err);
-            alert('Unable to play audio. Your browser may not support Web Audio API.');
-        }
+            alert('Unable to play audio. Try tapping play again.');
+        });
     }
 }
 
 // Volume Control
 function setVolume(value) {
-    if (masterGain) {
-        masterGain.gain.value = value / 100;
-    }
+    audioPlayer.volume = value / 100;
     localStorage.setItem('sleepAppVolume', value);
 }
 
@@ -296,11 +211,13 @@ function setupEventListeners() {
     // Theme toggle
     themeToggle.addEventListener('click', toggleTheme);
 
-    // Restore volume on load
+    // Restore volume on load (or apply the slider's default so it matches)
     const savedVolume = localStorage.getItem('sleepAppVolume');
     if (savedVolume) {
         volumeSlider.value = savedVolume;
         setVolume(savedVolume);
+    } else {
+        setVolume(volumeSlider.value);
     }
 
     // System theme change listener
