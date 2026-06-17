@@ -1,30 +1,19 @@
 // Sleep App - Main Application Logic
 
-// Audio sources for different sounds (using verified working free streams)
-const AUDIO_SOURCES = {
-    ocean: [
-        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-        'https://assets.mixkit.co/active_storage/sfx/2728/2728-preview.mp3'
-    ],
-    forest: [
-        'https://assets.mixkit.co/active_storage/sfx/2734/2734-preview.mp3',
-        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3'
-    ],
-    snow: [
-        'https://assets.mixkit.co/active_storage/sfx/2729/2729-preview.mp3',
-        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'
-    ]
-};
+// Web Audio API for generating ambient sounds
+let audioContext = null;
+let oscillators = [];
+let gainNodes = [];
+let noiseBuffer = null;
 
 // Sound metadata
 const SOUND_INFO = {
-    ocean: { name: 'Ocean Waves', theme: 'ocean-theme', icon: '🌊' },
-    forest: { name: 'Forest Ambience', theme: 'forest-theme', icon: '🌲' },
-    snow: { name: 'Snow Silence', theme: 'snow-theme', icon: '❄️' }
+    ocean: { name: 'Ocean Waves', theme: 'ocean-theme', icon: '🌊', freq: [80, 120, 100] },
+    forest: { name: 'Forest Ambience', theme: 'forest-theme', icon: '🌲', freq: [150, 200, 180] },
+    snow: { name: 'Snow Silence', theme: 'snow-theme', icon: '❄️', freq: [200, 250, 220] }
 };
 
 // DOM Elements
-const audioPlayer = document.getElementById('audioPlayer');
 const playBtn = document.getElementById('playBtn');
 const volumeSlider = document.getElementById('volumeSlider');
 const currentSoundDisplay = document.getElementById('currentSound');
@@ -39,6 +28,7 @@ const body = document.body;
 let currentSound = 'ocean';
 let isPlaying = false;
 let isDarkMode = false;
+let masterGain = null;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
@@ -98,61 +88,122 @@ function selectSound(sound) {
     // Update display
     currentSoundDisplay.textContent = SOUND_INFO[sound].name;
 
-    // Load new audio
-    loadAudio(sound);
-
-    // If playing, restart with new sound
+    // If playing, switch to new sound
     if (isPlaying) {
-        audioPlayer.currentTime = 0;
-        audioPlayer.play().catch(err => console.log('Autoplay prevented:', err));
+        playAmbientSound(sound);
     }
 }
 
-// Audio Management
-function loadAudio(sound) {
-    const sources = AUDIO_SOURCES[sound];
-    if (!sources) return;
+// Initialize Web Audio API
+function initAudio() {
+    if (audioContext) return;
 
-    audioPlayer.src = sources[0];
-    audioPlayer.crossOrigin = 'anonymous';
-    audioPlayer.loop = true;
-    audioPlayer.preload = 'auto';
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioContext.createGain();
+    masterGain.connect(audioContext.destination);
 
-    console.log(`Loading audio: ${sound} from ${sources[0]}`);
+    // Create white noise buffer for ambient sounds
+    createNoiseBuffer();
+}
 
-    // Fallback to second source if first fails
-    audioPlayer.onerror = () => {
-        console.warn(`Failed to load ${sources[0]}, trying fallback...`);
-        if (sources[1]) {
-            audioPlayer.src = sources[1];
-            audioPlayer.load();
-            console.log(`Switched to fallback: ${sources[1]}`);
-        }
-    };
+// Create white noise for realistic ambient sounds
+function createNoiseBuffer() {
+    const bufferSize = audioContext.sampleRate * 2;
+    const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
 
-    audioPlayer.load();
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+    }
+
+    window.noiseBuffer = noiseBuffer;
+}
+
+// Play ambient sound using Web Audio API
+function playAmbientSound(soundType) {
+    if (!audioContext) initAudio();
+
+    // Stop any existing sounds
+    stopSound();
+
+    const frequencies = SOUND_INFO[soundType].freq;
+
+    // Create noise source
+    const noiseSource = audioContext.createBufferSource();
+    noiseSource.buffer = window.noiseBuffer;
+    noiseSource.loop = true;
+
+    // Create filter for different characteristics
+    const filter = audioContext.createBiquadFilter();
+    filter.type = 'lowpass';
+
+    if (soundType === 'ocean') {
+        filter.frequency.value = 800;
+        filter.Q.value = 1;
+    } else if (soundType === 'forest') {
+        filter.frequency.value = 1200;
+        filter.Q.value = 0.5;
+    } else if (soundType === 'snow') {
+        filter.frequency.value = 6000;
+        filter.Q.value = 0.3;
+    }
+
+    // Connect nodes
+    noiseSource.connect(filter);
+    filter.connect(masterGain);
+
+    // Add subtle low frequency oscillators for ambient feel
+    const osc = audioContext.createOscillator();
+    osc.frequency.value = frequencies[0];
+    osc.type = 'sine';
+
+    const oscGain = audioContext.createGain();
+    oscGain.gain.value = 0.02;
+
+    osc.connect(oscGain);
+    oscGain.connect(masterGain);
+
+    noiseSource.start(0);
+    osc.start(0);
+
+    oscillators.push(osc);
+    gainNodes.push(oscGain);
+    oscillators.push(noiseSource);
+}
+
+function stopSound() {
+    oscillators.forEach(osc => {
+        try { osc.stop(); } catch(e) {}
+    });
+    oscillators = [];
+    gainNodes = [];
 }
 
 function togglePlayPause() {
     if (isPlaying) {
-        audioPlayer.pause();
+        stopSound();
         isPlaying = false;
         playBtn.classList.remove('playing');
         playBtn.textContent = '▶';
     } else {
-        audioPlayer.play().catch(err => {
-            console.log('Play failed:', err);
-            alert('Unable to play audio. Check your internet connection.');
-        });
-        isPlaying = true;
-        playBtn.classList.add('playing');
-        playBtn.textContent = '⏸';
+        try {
+            initAudio();
+            playAmbientSound(currentSound);
+            isPlaying = true;
+            playBtn.classList.add('playing');
+            playBtn.textContent = '⏸';
+        } catch (err) {
+            console.error('Play failed:', err);
+            alert('Unable to play audio. Your browser may not support Web Audio API.');
+        }
     }
 }
 
 // Volume Control
 function setVolume(value) {
-    audioPlayer.volume = value / 100;
+    if (masterGain) {
+        masterGain.gain.value = value / 100;
+    }
     localStorage.setItem('sleepAppVolume', value);
 }
 
@@ -228,19 +279,6 @@ function setupEventListeners() {
 
     // Theme toggle
     themeToggle.addEventListener('click', toggleTheme);
-
-    // Audio events
-    audioPlayer.addEventListener('play', () => {
-        isPlaying = true;
-        playBtn.classList.add('playing');
-        playBtn.textContent = '⏸';
-    });
-
-    audioPlayer.addEventListener('pause', () => {
-        isPlaying = false;
-        playBtn.classList.remove('playing');
-        playBtn.textContent = '▶';
-    });
 
     // Restore volume on load
     const savedVolume = localStorage.getItem('sleepAppVolume');
