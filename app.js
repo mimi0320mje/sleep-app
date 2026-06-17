@@ -1,18 +1,18 @@
 // Sleep App - Main Application Logic
 
-// Audio sources for different sounds (using free streaming and local fallbacks)
+// Audio sources for different sounds (using free CC0 licensed audio)
 const AUDIO_SOURCES = {
     ocean: [
-        'https://cdn.pixabay.com/download/audio/2022/02/15/audio_8b3e26c45f.mp3',
-        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' // Fallback - generic ambient
+        'https://cdn.pixabay.com/media/assets/cdn-shop/20230712/original-86f32b4e-7a5e-47a0-9f04-b4ed85b8e6be.mp3',
+        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3'
     ],
     forest: [
-        'https://cdn.pixabay.com/download/audio/2022/02/15/audio_2dd555e04e.mp3',
-        'https://freepd.com/music/Dark%20Forest.mp3'
+        'https://cdn.pixabay.com/media/assets/cdn-shop/20221211/original-dc96e34f-0d6f-485d-b8c1-1d2cee98eb6b.mp3',
+        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'
     ],
     snow: [
-        'https://cdn.pixabay.com/download/audio/2022/02/15/audio_e2d3e7dbc0.mp3',
-        'https://freepd.com/music/Winter%20Silence.mp3'
+        'https://cdn.pixabay.com/media/assets/cdn-shop/20210831/original-2c87fa37-69cf-4e3f-b6c5-d7f47e4186fb.mp3',
+        'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3'
     ]
 };
 
@@ -116,14 +116,21 @@ function loadAudio(sound) {
     audioPlayer.src = sources[0];
     audioPlayer.crossOrigin = 'anonymous';
     audioPlayer.loop = true;
+    audioPlayer.preload = 'auto';
+
+    console.log(`Loading audio: ${sound} from ${sources[0]}`);
 
     // Fallback to second source if first fails
-    audioPlayer.addEventListener('error', () => {
+    audioPlayer.onerror = () => {
+        console.warn(`Failed to load ${sources[0]}, trying fallback...`);
         if (sources[1]) {
             audioPlayer.src = sources[1];
             audioPlayer.load();
+            console.log(`Switched to fallback: ${sources[1]}`);
         }
-    }, { once: true });
+    };
+
+    audioPlayer.load();
 }
 
 function togglePlayPause() {
@@ -152,18 +159,19 @@ function setVolume(value) {
 // Geolocation & IP Display
 async function loadLocation() {
     try {
-        const response = await fetch('https://ip-api.com/json/?fields=query,city,country,timezone');
+        // Using ipwho.is - CORS-friendly API
+        const response = await fetch('https://ipwho.is/');
         if (!response.ok) throw new Error('Network response was not ok');
 
         const data = await response.json();
-        const ip = data.query;
+        const ip = data.ip || '[unknown]';
         const city = data.city || 'Unknown';
         const country = data.country || 'Unknown';
         const timezone = data.timezone || '';
 
         locationInfo.textContent = `IP: ${ip} | ${city}, ${country}`;
 
-        // Optionally set dark mode based on time of day (if timezone available)
+        // Set dark mode based on time of day
         if (timezone && !localStorage.getItem('sleepAppTheme')) {
             const now = new Date();
             const hour = now.getHours();
@@ -174,7 +182,18 @@ async function loadLocation() {
         }
     } catch (error) {
         console.error('Error fetching location:', error);
-        locationInfo.textContent = 'IP: [unavailable]';
+        locationInfo.textContent = 'IP: [loading...]';
+
+        // Try fallback API
+        try {
+            const fallback = await fetch('https://api.ipify.org?format=json');
+            if (fallback.ok) {
+                const data = await fallback.json();
+                locationInfo.textContent = `IP: ${data.ip}`;
+            }
+        } catch (e) {
+            locationInfo.textContent = 'IP: [checking...]';
+        }
     }
 }
 
